@@ -5,6 +5,7 @@ namespace Laravel\Scout\Console;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Laravel\Scout\EngineManager;
 
@@ -47,31 +48,30 @@ class IndexCommand extends Command
                 $model = new $modelName;
             }
 
-            $name = $this->indexName($this->argument('name'));
+            foreach ($this->indexNames($this->argument('name')) as $name) {
+                $engine->createIndex($name, $options);
+                if (method_exists($engine, 'updateIndexSettings')) {
+                    $driver = config('scout.driver');
 
-            $engine->createIndex($name, $options);
+                    $class = isset($model) ? get_class($model) : null;
 
-            if (method_exists($engine, 'updateIndexSettings')) {
-                $driver = config('scout.driver');
+                    $settings = config('scout.'.$driver.'.index-settings.'.$name)
+                                    ?? config('scout.'.$driver.'.index-settings.'.$class)
+                                    ?? [];
 
-                $class = isset($model) ? get_class($model) : null;
+                    if (isset($model) &&
+                        config('scout.soft_delete', false) &&
+                        in_array(SoftDeletes::class, class_uses_recursive($model))) {
+                        $settings['filterableAttributes'][] = '__soft_deleted';
+                    }
 
-                $settings = config('scout.'.$driver.'.index-settings.'.$name)
-                                ?? config('scout.'.$driver.'.index-settings.'.$class)
-                                ?? [];
-
-                if (isset($model) &&
-                    config('scout.soft_delete', false) &&
-                    in_array(SoftDeletes::class, class_uses_recursive($model))) {
-                    $settings['filterableAttributes'][] = '__soft_deleted';
+                    if ($settings) {
+                        $engine->updateIndexSettings($name, $settings);
+                    }
                 }
 
-                if ($settings) {
-                    $engine->updateIndexSettings($name, $settings);
-                }
+                $this->info('Index ["'.$name.'"] created successfully.');
             }
-
-            $this->info('Index ["'.$name.'"] created successfully.');
         } catch (Exception $exception) {
             $this->error($exception->getMessage());
         }
@@ -81,16 +81,17 @@ class IndexCommand extends Command
      * Get the fully-qualified index name for the given index.
      *
      * @param  string  $name
-     * @return string
+     * @return array
      */
-    protected function indexName($name)
+    protected function indexNames($name)
     {
         if (class_exists($name)) {
-            return (new $name)->searchableAs();
+            $searchableAs = (new $name)->searchableAs();
+            return is_array($searchableAs) ? $searchableAs : [$searchableAs];
         }
 
         $prefix = config('scout.prefix');
 
-        return ! Str::startsWith($name, $prefix) ? $prefix.$name : $name;
+        return ! Str::startsWith($name, $prefix) ? [$prefix.$name] : [$name];
     }
 }

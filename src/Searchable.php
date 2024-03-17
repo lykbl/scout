@@ -302,7 +302,7 @@ trait Searchable
     /**
      * Get the index name for the model.
      *
-     * @return string
+     * @return string|array
      */
     public function searchableAs()
     {
@@ -314,7 +314,7 @@ trait Searchable
      *
      * @return array
      */
-    public function toSearchableArray()
+    public function toSearchableArray(?string $indexName = null) //TODO needed?
     {
         return $this->toArray();
     }

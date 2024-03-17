@@ -58,7 +58,7 @@ class TypesenseEngine extends Engine
             return;
         }
 
-        $collection = $this->getOrCreateCollectionFromModel($models->first());
+        $collection = $this->getOrCreateCollectionFromModel($models->first(), null);
 
         if ($this->usesSoftDelete($models->first()) && config('scout.soft_delete', false)) {
             $models->each->pushSoftDeleteMetadata();
@@ -147,7 +147,7 @@ class TypesenseEngine extends Engine
     {
         $models->each(function (Model $model) {
             $this->deleteDocument(
-                $this->getOrCreateCollectionFromModel($model),
+                $this->getOrCreateCollectionFromModel($model, null),
                 $model->getScoutKey()
             );
         });
@@ -225,7 +225,7 @@ class TypesenseEngine extends Engine
      */
     protected function performSearch(Builder $builder, array $options = []): mixed
     {
-        $documents = $this->getOrCreateCollectionFromModel($builder->model)->getDocuments();
+        $documents = $this->getOrCreateCollectionFromModel($builder->model, $builder->index)->getDocuments();
 
         if ($builder->callback) {
             return call_user_func($builder->callback, $documents, $builder->query, $options);
@@ -449,7 +449,7 @@ class TypesenseEngine extends Engine
      */
     public function flush($model)
     {
-        $this->getOrCreateCollectionFromModel($model)->delete();
+        $this->getOrCreateCollectionFromModel($model, null)->delete();
     }
 
     /**
@@ -490,9 +490,12 @@ class TypesenseEngine extends Engine
      * @throws \Typesense\Exceptions\TypesenseClientError
      * @throws \Http\Client\Exception
      */
-    protected function getOrCreateCollectionFromModel($model): TypesenseCollection
+    protected function getOrCreateCollectionFromModel($model, $indexName): TypesenseCollection
     {
-        $index = $this->typesense->getCollections()->{$model->searchableAs()};
+        $searchableAs = $model->searchableAs();//TODO finish this
+        $indexName = is_array($indexName) ? $indexName[0] : $indexName;
+
+        $index = $this->typesense->getCollections()->$indexName;
 
         try {
             $index->retrieve();

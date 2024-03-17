@@ -130,6 +130,7 @@ class CollectionEngine extends Engine
                 return true;
             }
 
+            //todo wtf is this
             $searchables = $model->toSearchableArray();
 
             foreach ($searchables as $value) {
