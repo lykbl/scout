@@ -61,9 +61,11 @@ class SyncIndexSettingsCommand extends Command
                         $settings['filterableAttributes'][] = '__soft_deleted';
                     }
 
-                    $engine->updateIndexSettings($indexName = $this->indexName($name), $settings);
+                    foreach ($this->indexNames($name) as $indexName) {
+                        $engine->updateIndexSettings($indexName, $settings);
 
-                    $this->info('Settings for the ['.$indexName.'] index synced successfully.');
+                        $this->info('Settings for the [' . $indexName . '] index synced successfully.');
+                    }
                 }
             } else {
                 $this->info('No index settings found for the "'.$driver.'" engine.');
@@ -77,16 +79,18 @@ class SyncIndexSettingsCommand extends Command
      * Get the fully-qualified index name for the given index.
      *
      * @param  string  $name
-     * @return string
+     * @return array
      */
-    protected function indexName($name)
+    protected function indexNames($name)
     {
         if (class_exists($name)) {
-            return (new $name)->searchableAs();
+            $indexNames = (new $name)->searchableAs();
+
+            return is_array($indexNames) ? $indexNames : [$indexNames];
         }
 
         $prefix = config('scout.prefix');
 
-        return ! Str::startsWith($name, $prefix) ? $prefix.$name : $name;
+        return ! Str::startsWith($name, $prefix) ? [$prefix.$name] : [$name];
     }
 }

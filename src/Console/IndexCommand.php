@@ -5,6 +5,7 @@ namespace Laravel\Scout\Console;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Laravel\Scout\EngineManager;
 
@@ -47,31 +48,33 @@ class IndexCommand extends Command
                 $model = new $modelName;
             }
 
-            $name = $this->indexName($this->argument('name'));
+            $names = $this->indexNames($this->argument('name'));
+            $names = is_array($names) ? $names : [$names];
 
-            $engine->createIndex($name, $options);
+            foreach ($names as $name) {
+                $engine->createIndex($name, $options);
+                if (method_exists($engine, 'updateIndexSettings')) {
+                    $driver = config('scout.driver');
 
-            if (method_exists($engine, 'updateIndexSettings')) {
-                $driver = config('scout.driver');
+                    $class = isset($model) ? get_class($model) : null;
 
-                $class = isset($model) ? get_class($model) : null;
+                    $settings = config('scout.'.$driver.'.index-settings.'.$name)
+                                    ?? config('scout.'.$driver.'.index-settings.'.$class)
+                                    ?? [];
 
-                $settings = config('scout.'.$driver.'.index-settings.'.$name)
-                                ?? config('scout.'.$driver.'.index-settings.'.$class)
-                                ?? [];
+                    if (isset($model) &&
+                        config('scout.soft_delete', false) &&
+                        in_array(SoftDeletes::class, class_uses_recursive($model))) {
+                        $settings['filterableAttributes'][] = '__soft_deleted';
+                    }
 
-                if (isset($model) &&
-                    config('scout.soft_delete', false) &&
-                    in_array(SoftDeletes::class, class_uses_recursive($model))) {
-                    $settings['filterableAttributes'][] = '__soft_deleted';
+                    if ($settings) {
+                        $engine->updateIndexSettings($name, $settings);
+                    }
                 }
 
-                if ($settings) {
-                    $engine->updateIndexSettings($name, $settings);
-                }
+                $this->info('Index ["'.$name.'"] created successfully.');
             }
-
-            $this->info('Index ["'.$name.'"] created successfully.');
         } catch (Exception $exception) {
             $this->error($exception->getMessage());
         }
@@ -81,9 +84,9 @@ class IndexCommand extends Command
      * Get the fully-qualified index name for the given index.
      *
      * @param  string  $name
-     * @return string
+     * @return string|array
      */
-    protected function indexName($name)
+    protected function indexNames($name)
     {
         if (class_exists($name)) {
             return (new $name)->searchableAs();

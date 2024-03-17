@@ -302,7 +302,7 @@ trait Searchable
     /**
      * Get the index name for the model.
      *
-     * @return string
+     * @return string|array
      */
     public function searchableAs()
     {

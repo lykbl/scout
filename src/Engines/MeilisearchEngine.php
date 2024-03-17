@@ -53,7 +53,11 @@ class MeilisearchEngine extends Engine
             return;
         }
 
-        $index = $this->meilisearch->index($models->first()->searchableAs());
+        $indexNames = $models->first()->searchableAs();
+        $indexNames = is_array($indexNames) ? $indexNames : [$indexNames];
+        foreach ($indexNames as $indexName) {
+            $index = $this->meilisearch->index($indexName);
+        }
 
         if ($this->usesSoftDelete($models->first()) && $this->softDelete) {
             $models->each->pushSoftDeleteMetadata();
@@ -88,13 +92,18 @@ class MeilisearchEngine extends Engine
             return;
         }
 
-        $index = $this->meilisearch->index($models->first()->searchableAs());
+        $indexNames = $models->first()->searchableAs();
+        $indexNames = is_array($indexNames) ? $indexNames : [$indexNames];
 
-        $keys = $models instanceof RemoveableScoutCollection
-            ? $models->pluck($models->first()->getScoutKeyName())
-            : $models->map->getScoutKey();
+        foreach ($indexNames as $indexName) {
+            $index = $this->meilisearch->index($indexName);
 
-        $index->deleteDocuments($keys->values()->all());
+            $keys = $models instanceof RemoveableScoutCollection
+                ? $models->pluck($models->first()->getScoutKeyName())
+                : $models->map->getScoutKey();
+
+            $index->deleteDocuments($keys->values()->all());
+        }
     }
 
     /**
@@ -139,7 +148,9 @@ class MeilisearchEngine extends Engine
      */
     protected function performSearch(Builder $builder, array $searchParams = [])
     {
-        $meilisearch = $this->meilisearch->index($builder->index ?: $builder->model->searchableAs());
+        $indexNames = $builder->model->searchableAs();
+        $fallbackIndex = is_array($indexNames) ? $indexNames[0] : $indexNames;
+        $meilisearch = $this->meilisearch->index($builder->index ?: $fallbackIndex);
 
         $searchParams = array_merge($builder->options, $searchParams);
 
@@ -363,9 +374,14 @@ class MeilisearchEngine extends Engine
      */
     public function flush($model)
     {
-        $index = $this->meilisearch->index($model->searchableAs());
+        $indexNames = $model->searchableAs();
+        $indexNames = is_array($indexNames) ? $indexNames : [$indexNames];
 
-        $index->deleteAllDocuments();
+        foreach ($indexNames as $indexName) {
+            $index = $this->meilisearch->index($indexName);
+
+            $index->deleteAllDocuments();
+        }
     }
 
     /**
